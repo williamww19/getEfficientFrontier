@@ -24,10 +24,13 @@ cov_annual = cov_daily * 250
 # empty lists to store returns, volatility and weights of imiginary portfolios
 port_returns = []
 port_volatility = []
+sharpe_ratio = []
 stock_weights = []
 
 # set the number of combinations for imaginary portfolios
 num_assets = len(selected)
+
+np.random.seed(1234)
 
 def getPort(num_portfolios=50000):
     for single_portfolio in range(num_portfolios):
@@ -36,12 +39,15 @@ def getPort(num_portfolios=50000):
         returns = np.dot(weights, returns_annual)
         # cal std. - square root of
         volatility = np.sqrt(np.dot(weights.T, np.dot(cov_annual, weights)))
+        sharpe = returns / volatility
+        sharpe_ratio.append(sharpe)
         port_returns.append(returns)
         port_volatility.append(volatility)
         stock_weights.append(weights)
 
     portfolio = {'Returns': port_returns,
-                 'Volatility': port_volatility}
+                 'Volatility': port_volatility,
+                 'Sharpe Ratio': sharpe_ratio}
 
     return portfolio
 
@@ -52,15 +58,24 @@ def getDF(port):
 
     df = pd.DataFrame(port)
 
-    column_order = ['Returns', 'Volatility'] + [stock+' Weight' for stock in selected]
+    column_order = ['Returns', 'Volatility', 'Sharpe Ratio'] + [stock+' Weight' for stock in selected]
     df = df[column_order]
 
     return df
 
 def plotEF(df):
     # plot the efficient frontier with a scatter plot
-    plt.style.use('seaborn')
-    df.plot.scatter(x='Volatility', y='Returns', figsize=(10,8), grid=True)
+    min_volatility = df['Volatility'].min()
+    max_sharpe = df['Sharpe Ratio'].max()
+
+    sharpe_portfolio = df.loc[df['Sharpe Ratio'] == max_sharpe]
+    min_variance_port = df.loc[df['Volatility'] == min_volatility]
+
+    plt.style.use('seaborn-dark')
+    df.plot.scatter(x='Volatility', y='Returns', c='Sharpe Ratio',
+                    cmap='RdYlGn', edgecolors='k', figsize=(10,8), grid=True)
+    plt.scatter(x=sharpe_portfolio['Volatility'], y=sharpe_portfolio['Returns'], c='red', marker='D', s=200)
+    plt.scatter(x=min_variance_port['Volatility'], y=min_variance_port['Returns'], c='blue', marker='D', s=200 )
     plt.xlabel('Std.')
     plt.ylabel('Exp. Return')
     plt.title('Portfolio EF')
@@ -68,4 +83,5 @@ def plotEF(df):
 
 if __name__ == '__main__':
     port = getPort()
-    plotEF(getDF(port))
+    df = getDF(port)
+    plotEF(df)
